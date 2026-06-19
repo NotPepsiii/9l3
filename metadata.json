@@ -1,0 +1,6 @@
+{
+  "name": "The 9th Lough Takeaway",
+  "description": "Authentic Irish Chipper and Takeaway based in Clondalkin, Dublin, featuring an interactive online ordering system, opening hours tracker, and real-time order progression tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

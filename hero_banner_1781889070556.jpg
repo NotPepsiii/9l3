@@ -1,0 +1,248 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useEffect } from 'react';
+import { ChefHat, Compass, Smile, PackageCheck, Clock, Check, AlertCircle, ShoppingBag } from 'lucide-react';
+import { Order, OrderStatus } from '../types';
+
+interface OrderTrackerProps {
+  orders: Order[];
+  onUpdateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  onCancelOrder: (orderId: string) => void;
+}
+
+export default function OrderTracker({
+  orders,
+  onUpdateOrderStatus,
+  onCancelOrder
+}: OrderTrackerProps) {
+
+  // Auto-progress simulation for a lively preview!
+  useEffect(() => {
+    if (orders.length === 0) return;
+
+    const interval = setInterval(() => {
+      orders.forEach((order) => {
+        if (order.status === 'pending') {
+          onUpdateOrderStatus(order.id, 'preparing');
+        } else if (order.status === 'preparing') {
+          onUpdateOrderStatus(order.id, 'on_the_way');
+        } else if (order.status === 'on_the_way') {
+          onUpdateOrderStatus(order.id, 'delivered');
+        }
+      });
+    }, 25000); // Progress steps every 25 seconds for demonstration purposes
+
+    return () => clearInterval(interval);
+  }, [orders, onUpdateOrderStatus]);
+
+  if (orders.length === 0) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-12 text-center">
+        <div className="bg-white border border-gray-100 rounded-2xl p-12 shadow-xs">
+          <ChefHat className="w-16 h-16 text-amber-500 mx-auto mb-4 animate-bounce" />
+          <h3 className="text-lg font-bold text-gray-950 mb-1">No active orders found</h3>
+          <p className="text-xs text-gray-600 font-semibold max-w-sm mx-auto leading-relaxed">
+            Ready for a delicious Irish chipper meal? Place an order in the online store to see the interactive kitchen progression bar!
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Define steps for progression
+  const steps: { status: OrderStatus; label: string; desc: string; icon: React.ReactNode }[] = [
+    {
+      status: 'pending',
+      label: 'Verified',
+      desc: 'Order received by the kitchen',
+      icon: <Check className="w-5 h-5" />
+    },
+    {
+      status: 'preparing',
+      label: 'Frying & Grilling',
+      desc: 'Burgers searing & chips fresh double cooking',
+      icon: <ChefHat className="w-5 h-5" />
+    },
+    {
+      status: 'on_the_way',
+      label: 'On the Way',
+      desc: 'Out with our rapid Dublin 22 courier',
+      icon: <Compass className="w-5 h-5" />
+    },
+    {
+      status: 'delivered',
+      label: 'Delivered',
+      desc: 'Enjoy your hot takeaway feast!',
+      icon: <Smile className="w-5 h-5" />
+    }
+  ];
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-8 space-y-8 min-h-screen">
+      <div className="flex items-center gap-2">
+        <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping"></span>
+        <h2 className="text-2xl font-black text-slate-900 tracking-tight">Active Deliveries</h2>
+      </div>
+
+      {orders.map((order) => {
+        const subtotal = order.items.reduce((acc, item) => acc + (item.menuItem.price * item.quantity), 0);
+        
+        // Find current step index
+        const currentStepIndex = steps.findIndex(s => s.status === order.status);
+        const isCancelled = order.status === 'cancelled';
+
+        return (
+          <div
+            key={order.id}
+            className="bg-white rounded-2xl border border-gray-100 shadow-md overflow-hidden animate-in fade-in"
+          >
+            {/* Header / Meta */}
+            <div className="p-6 bg-slate-900 text-white flex flex-wrap justify-between items-center gap-4 border-b border-gray-800">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 px-2.5 py-1 rounded-md">
+                  ID: {order.id}
+                </span>
+                <p className="text-xs text-gray-400 font-bold mt-2">Placed at {order.timestamp}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-400 font-bold">Estimated Arrival</p>
+                <p className="text-lg font-black text-amber-400">
+                  {order.status === 'delivered' ? 'Arrived!' : `${order.estimatedDeliveryTime} mins`}
+                </p>
+              </div>
+            </div>
+
+            {/* Tracker Progression */}
+            <div className="p-6 border-b border-gray-100 bg-slate-50">
+              {isCancelled ? (
+                <div className="p-4 bg-rose-50 text-rose-800 rounded-xl border border-rose-100 flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
+                  <div>
+                    <h4 className="text-sm font-bold">Order Cancelled</h4>
+                    <p className="text-xs font-semibold text-rose-600 mt-1 leading-normal">
+                      This order was successfully cancelled and refunded. Feel free to order again or call us.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="relative flex justify-between items-center">
+                    {/* Line behind steps */}
+                    <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-1 bg-gray-200 -z-10" />
+                    <div
+                      className="absolute left-6 top-1/2 -translate-y-1/2 h-1 bg-amber-500 -z-10 transition-all duration-500"
+                      style={{
+                        width: `${(currentStepIndex / (steps.length - 1)) * 100}%`,
+                        right: 'auto'
+                      }}
+                    />
+
+                    {steps.map((step, idx) => {
+                      const isCompleted = idx <= currentStepIndex;
+                      const isActive = idx === currentStepIndex;
+
+                      return (
+                        <div key={step.status} className="flex flex-col items-center">
+                          <div
+                            className={`w-12 h-12 rounded-full border-4 flex items-center justify-center transition-all ${
+                              isCompleted
+                                ? isActive
+                                  ? 'bg-amber-400 border-amber-500 text-slate-950 ring-4 ring-amber-100 animate-pulseScale'
+                                  : 'bg-emerald-500 border-emerald-500 text-white'
+                                : 'bg-white border-gray-200 text-gray-400'
+                            }`}
+                          >
+                            {step.icon}
+                          </div>
+                          <span
+                            className={`text-[10px] font-black uppercase mt-2 tracking-wide text-center leading-none ${
+                              isActive ? 'text-amber-500 font-extrabold' : 'text-gray-500'
+                            }`}
+                          >
+                            {step.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Current Active Step text banner */}
+                  <div className="mt-8 p-3 rounded-lg bg-amber-50/50 border border-amber-100 text-center text-xs text-amber-950 font-bold flex items-center justify-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-500" />
+                    <span>Status: {steps[currentStepIndex]?.desc || 'Authenticating...'}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Receipt Summary details */}
+            <div className="p-6 space-y-4">
+              <h4 className="text-xs font-black text-gray-500 uppercase tracking-wider">Item Breakdown</h4>
+              <div className="divide-y divide-gray-100 rounded-xl bg-gray-50 p-4 font-semibold text-xs text-gray-700">
+                {order.items.map((item, id) => (
+                  <div key={id} className="py-2.5 flex justify-between items-center">
+                    <div>
+                      <span>{item.quantity}x {item.menuItem.name}</span>
+                      {item.specialInstructions && (
+                        <p className="text-[10px] text-amber-700 italic mt-0.5 font-medium">&ldquo;{item.specialInstructions}&rdquo;</p>
+                      )}
+                    </div>
+                    <span className="font-extrabold text-gray-900">€{(item.menuItem.price * item.quantity).toFixed(2)}</span>
+                  </div>
+                ))}
+                
+                <div className="pt-3 mt-1 border-t border-gray-200 space-y-1">
+                  <div className="flex justify-between text-[11px] text-gray-500">
+                    <span>Subtotal</span>
+                    <span>€{subtotal.toFixed(2)}</span>
+                  </div>
+                  {order.type === 'delivery' && (
+                    <div className="flex justify-between text-[11px] text-gray-500">
+                      <span>Delivery Charge</span>
+                      <span>{order.deliveryFee === 0 ? 'FREE' : `€${order.deliveryFee.toFixed(2)}`}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm font-black text-gray-950 pt-1">
+                    <span>Total Paid ({order.type})</span>
+                    <span className="text-amber-600">€{order.total.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Delivery address info of customer */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                <div>
+                  <h5 className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">Customer Address</h5>
+                  <p className="text-xs font-semibold text-gray-700 leading-normal">
+                    {order.customerName} <br />
+                    {order.type === 'delivery' ? order.customerAddress : 'Collected at the shop (Clondalkin)'}
+                  </p>
+                </div>
+                <div>
+                  <h5 className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">Phone Number</h5>
+                  <p className="text-xs font-semibold text-gray-700">{order.customerPhone}</p>
+                </div>
+              </div>
+
+              {/* Actions: Cancel Order if still pending */}
+              {order.status === 'pending' && (
+                <div className="pt-4 border-t border-gray-100 flex justify-end">
+                  <button
+                    onClick={() => onCancelOrder(order.id)}
+                    className="px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 border border-thin border-rose-200 rounded-lg transition-colors"
+                  >
+                    Cancel Order
+                  </button>
+                </div>
+              )}
+            </div>
+
+          </div>
+        );
+      })}
+    </div>
+  );
+}

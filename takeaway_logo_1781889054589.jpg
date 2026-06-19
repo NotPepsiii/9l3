@@ -1,0 +1,392 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState } from 'react';
+import { X, Truck, Store, MapPin, Phone, User, CreditCard, Lock, ArrowRight, ClipboardCheck } from 'lucide-react';
+import { CartItem, Order, MenuItem } from '../types';
+import { CONTACT_INFO } from '../data/menu';
+
+interface CheckoutModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  cart: CartItem[];
+  onOrderCreated: (order: Order) => void;
+  onClearCart: () => void;
+}
+
+export default function CheckoutModal({
+  isOpen,
+  onClose,
+  cart,
+  onOrderCreated,
+  onClearCart
+}: CheckoutModalProps) {
+  if (!isOpen) return null;
+
+  const [orderType, setOrderType] = useState<'delivery' | 'collection'>('delivery');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [deliveryEircode, setDeliveryEircode] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const subTotal = cart.reduce((total, item) => total + (item.menuItem.price * item.quantity), 0);
+  const deliveryFee = orderType === 'delivery' && subTotal < CONTACT_INFO.freeDeliveryThreshold
+    ? CONTACT_INFO.deliveryFee
+    : 0;
+  const grandTotal = subTotal + deliveryFee;
+
+  const handlePlaceOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage('');
+
+    // Validation
+    if (!customerName.trim()) {
+      setErrorMessage('Please enter your full name.');
+      return;
+    }
+    if (!customerPhone.trim() || customerPhone.length < 7) {
+      setErrorMessage('Please enter a valid Irish phone number.');
+      return;
+    }
+    if (orderType === 'delivery') {
+      if (subTotal < CONTACT_INFO.minDeliveryOrder) {
+        setErrorMessage(`Minimum order for delivery is €${CONTACT_INFO.minDeliveryOrder.toFixed(2)}. Please add more items or choose Collection.`);
+        return;
+      }
+      if (!customerAddress.trim()) {
+        setErrorMessage('Please provide your full delivery address in Clondalkin.');
+        return;
+      }
+    }
+
+    if (paymentMethod === 'card') {
+      if (cardNumber.replace(/\s+/g, '').length < 16) {
+        setErrorMessage('Please enter a valid 16-digit card number.');
+        return;
+      }
+      if (!cardExpiry || !cardCvv) {
+        setErrorMessage('Please fulfill card expiry and CVV credentials.');
+        return;
+      }
+    }
+
+    // Simulate ordering
+    setIsSubmitting(true);
+
+    setTimeout(() => {
+      const mockOrder: Order = {
+        id: `9TL-${Math.floor(1000 + Math.random() * 9000)}`,
+        items: [...cart],
+        total: grandTotal,
+        status: 'pending',
+        timestamp: new Date().toLocaleTimeString('en-IE', { hour: '2-digit', minute: '2-digit' }),
+        type: orderType,
+        customerName,
+        customerPhone,
+        customerAddress: orderType === 'delivery' ? `${customerAddress}${deliveryEircode ? `, ${deliveryEircode.toUpperCase()}` : ''}` : undefined,
+        deliveryFee,
+        estimatedDeliveryTime: orderType === 'delivery' ? 45 : 20,
+      };
+
+      onOrderCreated(mockOrder);
+      onClearCart();
+      setIsSubmitting(false);
+      onClose();
+    }, 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-slate-950/70 backdrop-blur-xs leading-none">
+      <div 
+        className="absolute inset-0"
+        onClick={onClose}
+      />
+
+      <div className="relative bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+        
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center z-10">
+          <div className="flex items-center gap-2">
+            <ClipboardCheck className="w-5.5 h-5.5 text-amber-500" />
+            <h3 className="text-base font-black tracking-tight text-gray-900 leading-none">
+              Complete Your Checkout
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Placing progress overlay */}
+        {isSubmitting ? (
+          <div className="p-12 flex flex-col items-center justify-center text-center">
+            <div className="relative flex items-center justify-center w-16 h-16 rounded-full bg-amber-50 mb-4 ring-8 ring-amber-100/50">
+              <span className="absolute animate-ping h-8 w-8 rounded-full bg-amber-400 opacity-75"></span>
+              <Lock className="w-6 h-6 text-amber-500 animate-pulse" />
+            </div>
+            <h4 className="text-base font-bold text-gray-900 mb-1">Authenticating Order Securely...</h4>
+            <p className="text-xs text-gray-600 font-semibold max-w-xs leading-relaxed">
+              Submitting to The 9th Lough kitchen system in Clondalkin. Please do not close this window.
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={handlePlaceOrder} className="p-6 space-y-6">
+
+            {/* Error banner */}
+            {errorMessage && (
+              <div className="p-3 bg-rose-50 text-rose-800 rounded-lg border border-rose-200 flex items-start gap-2.5">
+                <X className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <p className="text-xs font-bold leading-normal">{errorMessage}</p>
+              </div>
+            )}
+
+            {/* Delivery or Collection selector */}
+            <div>
+              <label className="block text-xs font-black text-gray-500 uppercase tracking-wider mb-2.5">
+                Delivery or Collection
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setOrderType('delivery')}
+                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border font-bold text-sm transition-all ${
+                    orderType === 'delivery'
+                      ? 'bg-amber-500 text-slate-950 border-amber-600 shadow-xs'
+                      : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <Truck className="w-4 h-4" />
+                  <span>Home Delivery</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrderType('collection')}
+                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border font-bold text-sm transition-all ${
+                    orderType === 'collection'
+                      ? 'bg-amber-500 text-slate-950 border-amber-600 shadow-xs'
+                      : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <Store className="w-4 h-4" />
+                  <span>Click & Collect</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Customer Information split */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-black text-gray-500 uppercase tracking-wider border-b border-gray-100 pb-1.5">
+                Contact Details
+              </h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1.5 flex items-center gap-1">
+                    <User className="w-3.5 h-3.5 text-gray-400" />
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="E.g., Conor McGregor"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="w-full p-3 rounded-lg bg-gray-50 border border-gray-200 text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1.5 flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5 text-gray-400" />
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="E.g., 087 123 4567"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    className="w-full p-3 rounded-lg bg-gray-50 border border-gray-200 text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              {/* Delivery Address if delivery */}
+              {orderType === 'delivery' && (
+                <div className="space-y-3 animate-in fade-in duration-150">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                      Street Address (Clondalkin area)
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="E.g., 14 Castle Park, Clondalkin"
+                      value={customerAddress}
+                      onChange={(e) => setCustomerAddress(e.target.value)}
+                      className="w-full p-3 rounded-lg bg-gray-50 border border-gray-200 text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                      Eircode (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="E.g., D22 X398"
+                      value={deliveryEircode}
+                      onChange={(e) => setDeliveryEircode(e.target.value)}
+                      className="w-full p-3 rounded-lg bg-gray-50 border border-gray-200 text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {orderType === 'collection' && (
+                <div className="p-3 bg-amber-50 text-amber-900 rounded-xl border border-amber-100 flex items-start gap-2.5">
+                  <MapPin className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="text-xs font-semibold leading-relaxed">
+                    <p className="font-bold">Collection Details:</p>
+                    <p className="text-gray-600">{CONTACT_INFO.address}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">Ready for pickup in 15-20 mins.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Payment Method Selector */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-black text-gray-500 uppercase tracking-wider border-b border-gray-100 pb-1.5">
+                Choose Payment Method
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('cash')}
+                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border font-bold text-sm transition-all ${
+                    paymentMethod === 'cash'
+                      ? 'bg-slate-900 text-white border-slate-950 shadow-xs'
+                      : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <span>{orderType === 'delivery' ? 'Cash on Delivery' : 'Pay at Counter'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('card')}
+                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border font-bold text-sm transition-all ${
+                    paymentMethod === 'card'
+                      ? 'bg-slate-900 text-white border-slate-950 shadow-xs'
+                      : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>Debit / Credit Card</span>
+                </button>
+              </div>
+
+              {paymentMethod === 'card' && (
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-3 animate-in fade-in duration-150">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-500 mb-1">Card Number</label>
+                    <input
+                      type="text"
+                      maxLength={19}
+                      placeholder="4000 1234 5678 9010"
+                      value={cardNumber}
+                      onChange={(e) => {
+                        // formats nicely
+                        const v = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+                        const matches = v.match(/\d{4,16}/g);
+                        const match = matches && matches[0] || '';
+                        const parts = [];
+                        for (let i = 0, len = match.length; i < len; i += 4) {
+                          parts.push(match.substring(i, i + 4));
+                        }
+                        if (parts.length > 0) {
+                          setCardNumber(parts.join(' '));
+                        } else {
+                          setCardNumber(v);
+                        }
+                      }}
+                      className="w-full p-2.5 rounded-lg bg-white border border-gray-200 text-xs font-semibold focus:ring-1 focus:ring-slate-900 focus:outline-hidden"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-500 mb-1">Expiry CVV</label>
+                      <input
+                        type="text"
+                        placeholder="MM/YY"
+                        value={cardExpiry}
+                        onChange={(e) => setCardExpiry(e.target.value)}
+                        className="w-full p-2.5 rounded-lg bg-white border border-gray-200 text-xs font-semibold focus:ring-1 focus:ring-slate-900 focus:outline-hidden"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-500 mb-1">CVV</label>
+                      <input
+                        type="password"
+                        maxLength={3}
+                        placeholder="123"
+                        value={cardCvv}
+                        onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, ''))}
+                        className="w-full p-2.5 rounded-lg bg-white border border-gray-200 text-xs font-semibold focus:ring-1 focus:ring-slate-900 focus:outline-hidden"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Receipt Summary info */}
+            <div className="bg-slate-50 rounded-xl p-4 space-y-2.5 text-xs">
+              <div className="flex justify-between items-center text-gray-500 font-bold">
+                <span>Total Items</span>
+                <span className="text-gray-900">{cart.reduce((tot, i) => tot + i.quantity, 0)} items</span>
+              </div>
+              <div className="flex justify-between items-center text-gray-500 font-bold">
+                <span>Subtotal</span>
+                <span className="text-gray-900">€{subTotal.toFixed(2)}</span>
+              </div>
+              {orderType === 'delivery' && (
+                <div className="flex justify-between items-center text-gray-500 font-bold">
+                  <span>Delivery Fee</span>
+                  <span className="text-gray-900">
+                    {deliveryFee === 0 ? 'FREE' : `€${deliveryFee.toFixed(2)}`}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between items-center pt-2 border-t border-gray-200 text-sm font-black">
+                <span>Total Charge</span>
+                <span className="text-amber-600 text-base">€{grandTotal.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* Place Order CTA */}
+            <button
+              type="submit"
+              className="w-full py-4 bg-amber-500 hover:bg-slate-900 hover:text-white text-slate-950 font-black text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
+            >
+              <span>Verify & Place Order</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+          </form>
+        )}
+
+      </div>
+    </div>
+  );
+}
